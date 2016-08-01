@@ -48,8 +48,8 @@ agent <- function(months) {
     
     # Dependent on whether they were arrested or not
     m.months_free <- ifelse(month == 1, 1,
-                            ifelse(m.prison_sentence > 0, 0,
-                                   tmp[2] + 1))
+                            ifelse(m.prison_sentence > 0, 1,
+                                   tmp.months_free + 1))
     
     ### TODO : base both of these on Utah data
     # Binary variable based on the conditional probability table from nationwide trends
@@ -74,8 +74,6 @@ agent <- function(months) {
     
     # Make temporary vector for determining months free in the next pass
     tmp.months_free <- if_else(m.rearrested_or_not == 1, 0, m.months_free)
-    tmp <- c(m.month, tmp.months_free, m.rearrested_or_not)
-    
   }
   
   # output results
