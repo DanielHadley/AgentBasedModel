@@ -1,34 +1,39 @@
 setwd("~/Github/AgentBasedModel/")
 
-#### Load data from national sources for calculating probabilities ####
+#### Load data from national and local sources for calculating probabilities ####
 
 ## Survival analysis ##
-
-survival_rates <- read.csv("./test.csv") %>% 
-  mutate(cumulative_percent = In.state / 100,
+# This is national data that comes from the BJS
+survival_rates <- read.csv("./clean_data/mschpprts05f02.csv", 
+                           stringsAsFactors = F) %>% 
+  filter(X != "",
+         X != "National") %>% 
+  mutate(In.state = as.numeric(X.1),
+         cumulative_percent = In.state / 100,
          cumulative_prob_did_not = 1 - cumulative_percent,
-         prob_recidivate = 1 - cumulative_prob_did_not / lag(cumulative_prob_did_not))
-
-survival_rates$prob_recidivate[1] <- 1 - survival_rates$cumulative_prob_did_not[1]
-
-survival_rates <- survival_rates %>% 
-  mutate(prob_did_not_recidivate = 1 - prob_recidivate) %>% 
+         prob_recidivate = 1 - cumulative_prob_did_not / lag(cumulative_prob_did_not),
+         prob_did_not_recidivate = 1 - prob_recidivate) %>% 
+  filter(In.state != 0) %>% 
   select(prob_recidivate, prob_did_not_recidivate)
 
 
 
 ## Prison terms ##
-prison_terms <- read.csv("./ncrp0908.csv") %>% 
-  filter(X != "", 
-         X != "Number of releases",
-         X != "All offenses") %>% 
-  rename(type = X,
-         percent = X.3,
-         median_term = X.5,
-         mean_term = X.7) %>% 
-  select(type, percent, median_term, mean_term)
+# Replaced national data with Utah specific data
+# I pieced this data together using an email from Julie Christensen, which contained recidivism rates for the COD demographic, and the Justice Reinvestment Report, which contained the average sentencing:
+# http://justice.utah.gov/Documents/CCJJ/Reports/Justice_Reinvestment_Report_2014.pdf
+# Before getting to the crime types and average sentences, though, it's important to grasp this statistic: 70% of parolees are returned on a technical violation. Only 30% are returned for crimes. WOW. Of those 70%, I estimate that 37 of the 70% are for parole violations, and 33 of the 70 are for probation violations
+utah_cod_recidivism_rates <- read.csv("./clean_data/utah_cod_recidivism_rates.csv")
 
 
+
+
+#### Functions needed for the Model ####
+calc_months_free <- function(month) {
+  ifelse(month == 1, 1,
+         ifelse(m.prison_sentence > 1, 0,
+                tmp.months_free + 1))
+}
 
 
 #### Now the function with the model ####
