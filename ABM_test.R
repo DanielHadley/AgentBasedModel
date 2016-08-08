@@ -30,10 +30,31 @@ prison_terms <- read.csv("./clean_data/utah_cod_recidivism_rates.csv") %>%
 
 
 #### Functions needed for the Model ####
-calc_months_free <- function(month) {
-  ifelse(month == 1, 1,
+calc_months_free <- function(m.month, m.prison_sentence, tmp.months_free) {
+  ifelse(m.month == 1, 1,
          ifelse(m.prison_sentence > 1, 0,
                 tmp.months_free + 1))
+}
+
+
+calc_odds_of_being_rearrested <- function(m.months_free) {
+  ifelse(m.months_free == 0, 0,
+         sample(x = c(1, 0), 
+                size = 1, 
+                replace = FALSE, 
+                prob = c(as.matrix(survival_rates[m.months_free,]))))
+}
+
+
+define_prison_sentence <- function(m.rearrested_or_not, m.month, tmp.prison_sentence) {
+  if_else(m.rearrested_or_not == 1,
+          as.numeric(sample(x = as.vector(prison_terms$mean_time_served),
+                            size = 1,
+                            replace = FALSE,
+                            prob = c(prison_terms$frequency))),
+          ifelse(m.month == 1, 0,
+                 ifelse(m.rearrested_or_not == 0,
+                        tmp.prison_sentence, 0)))
 }
 
 
@@ -53,32 +74,16 @@ agent <- function(months) {
     m.month <- month
     
     # Dependent on whether they were arrested or not
-    m.months_free <- ifelse(month == 1, 1,
-                            ifelse(m.prison_sentence > 1, 0,
-                                   tmp.months_free + 1))
+    m.months_free <- calc_months_free(m.month, m.prison_sentence, tmp.months_free)
     
-    ### TODO : base both of these on Utah data
     # Binary variable based on the conditional probability table from nationwide trends
-    m.rearrested_or_not <- ifelse(m.months_free == 0, 0,
-                                  sample(x = c(1, 0), 
-                                         size = 1, 
-                                         replace = FALSE, 
-                                         prob = c(as.matrix(
-                                           survival_rates[m.months_free,]))))
+    m.rearrested_or_not <- calc_odds_of_being_rearrested(m.months_free)
   
     
     # Add a prison sentence if there was an arrest
     # Also based on probability table from national trends 
-    m.prison_sentence <- if_else(m.rearrested_or_not == 1,
-                                 as.numeric(
-                                   sample(x = as.vector(prison_terms$mean_time_served),
-                                          size = 1,
-                                          replace = FALSE,
-                                          prob = c(prison_terms$frequency))
-                                 ),
-                                 ifelse(month == 1, 0,
-                                        ifelse(m.rearrested_or_not == 0,
-                                               tmp.prison_sentence, 0)))
+    m.prison_sentence <- define_prison_sentence(m.rearrested_or_not, m.month, tmp.prison_sentence)
+    
     
     # add month to the data frame
     df[month,] <- c(m.month, m.months_free, m.rearrested_or_not, m.prison_sentence)
