@@ -1,23 +1,10 @@
 setwd("~/Github/AgentBasedModel/")
+library(dplyr)
 
-#### Load data from national and local sources for calculating probabilities ####
-
-## Survival analysis ##
-# This is national data that comes from the BJS
-survival_rates <- read.csv("./clean_data/mschpprts05f02.csv", 
-                           stringsAsFactors = F) %>% 
-  filter(X != "",
-         X != "National") %>% 
-  mutate(In.state = as.numeric(X.1),
-         cumulative_percent = In.state / 100,
-         cumulative_prob_did_not = 1 - cumulative_percent,
-         prob_recidivate = 1 - cumulative_prob_did_not / lag(cumulative_prob_did_not),
-         prob_did_not_recidivate = 1 - prob_recidivate) %>% 
-  filter(In.state != 0) %>% 
-  select(prob_recidivate, prob_did_not_recidivate)
 
 
 
+#### Load data from national and local sources for calculating probabilities ####
 ## Prison terms ##
 # Replaced national data with Utah specific data
 # I pieced this data together using an email from Julie Christensen, which contained recidivism rates for the COD demographic, and the Justice Reinvestment Report, which contained the average sentencing:
@@ -26,11 +13,53 @@ survival_rates <- read.csv("./clean_data/mschpprts05f02.csv",
 prison_terms <- read.csv("./clean_data/utah_cod_recidivism_rates.csv", stringsAsFactors = FALSE) %>% 
   mutate(mean_time_served = round(mean_time_served))
 
+# I do these so that I can add a blank in the function below
+prison_terms[8,1] <- ""
+prison_terms[8,4] <- 0
+
+
+
+## Loads data on survival analysis, i.e., the time it takes people to recidivate, and turn it into a DF with the probability someone will recdiviate given the month free 
+# The two arguments define the recidivism baseline and reduction:
+# cntrl_inc_ovr_ntnl = what is the % increase (not % point increase) in our control group over national data (which looks similar to Utah's)? If 0, same as national trends
+# recid_reduction_ovr_cntrl = having defined the control group above, what is the % we expect the program to reduce recidivism?
+# The data that Julie sent suggest that the national trends for recidivism are very similar to the Utah trends (or at least they were between 2012 and 2015).
+# The data also show that our study group had a recidivsm rate that was 74.3% after 36 months, whereas all prisoners had a rate of 64.2% (again, close to natural). The difference between the control group and national trends is (74.3 - 64.2) / 64.2, which I will list as the default arg for the function below: cntrl_inc_ovr_ntnl <- 0.157
+load_survival_data <- function(cntrl_inc_ovr_ntnl, recid_reduction_ovr_cntrl){
+  
+  survival_rates <- read.csv("./clean_data/mschpprts05f02.csv", 
+                             stringsAsFactors = F) %>% 
+    filter(X != "",
+           X != "National") %>% 
+    mutate(In.state = as.numeric(X.1),
+           In.state_control = 
+             In.state + (In.state * cntrl_inc_ovr_ntnl),
+           In.state_treatment = 
+             In.state_control - (In.state_control * recid_reduction_ovr_cntrl),
+           cumulative_percent = In.state_treatment / 100,
+           cumulative_prob_did_not = 1 - cumulative_percent,
+           prob_recidivate = 
+             1 - cumulative_prob_did_not / lag(cumulative_prob_did_not),
+           prob_did_not_recidivate = 1 - prob_recidivate) %>% 
+    filter(In.state != 0) %>% 
+    select(prob_recidivate, prob_did_not_recidivate)
+}
+
+# I could not put this inside a function (probably global environment thing)
+# So I have it outside
+# This is national data : 
+survival_rates <- load_survival_data(0, 0)
+
+# This is the baseline for the COD population
+# survival_rates <- load_survival_data(.157, 0)
+
+# And this is the treatment group with a 20% reduction
+# survival_rates <- load_survival_data(.157, .2)
+
 
 
 
 #### Functions needed for the Model ####
-
 # If he is free, how many months has he been free
 calc_months_free <- function(m.month, m.prison_sentence, tmp.months_free) {
   ifelse(m.month == 1, 1,
@@ -49,7 +78,7 @@ calc_odds_of_being_rearrested <- function(m.months_free) {
 }
 
 
-# If arrested what is the prison sentence. This samples from the crime frequencies and returns a sentence based on the selected crime.
+# If arrested what is the prison sentence? This samples from the crime frequencies and returns a sentence based on the selected crime.
 define_crime_and_time <- function(m.rearrested_or_not, m.month, tmp.prison_sentence) {
   
   # First the index of crime and time, based on a probabilistic sample of crime types
@@ -78,7 +107,7 @@ define_crime_and_time <- function(m.rearrested_or_not, m.month, tmp.prison_sente
 }
 
 
-# Simply for summing later and helping with costs
+# Simply for summing later and helping with cost functions below
 say_if_in_prison <- function(m.prison_sentence) {
   ifelse(m.prison_sentence > 0, 1, 0)
 }
@@ -91,8 +120,10 @@ calc_prison_costs <- function(m.is_in_prison) {
 }
 
 
-#### Now the function with the model ####
-agent <- function(months) {
+
+
+#### A function with the single-agent model : this generates data for one person ####
+sim_single_agent <- function(months) {
   
   # Define some factors
   levels.crimetype <- factor(prison_terms$offense_type)
@@ -155,18 +186,51 @@ agent <- function(months) {
 
 
 
+
+sim_multi_agents <- function(n_agents, n_months){
+  
+  # set up the data frame
+  df <- data.frame(prison_time=numeric(0),
+                   months_free=numeric(0),
+                   prison_costs=numeric(0),
+                   arrests=numeric(0))
+  
+  # loop through each month and see what happens			
+  for (agent in 1:n_agents) {
+    
+    ### generate action for each person ###
+    single_agent <- sim_single_agent(n_months)
+    
+    # Sum things that happend to the agent
+    a.prison_time <- sum(as.numeric(single_agent$is_in_prison))
+    a.months_free <- sum(as.numeric(single_agent$months_free))
+    a.prison_costs <- sum(as.numeric(single_agent$prison_costs))
+    a.arrests <- sum(as.numeric(single_agent$rearrested_or_not))
+    
+    
+    # add month to the data frame
+    df[agent,] <- 
+      c(a.prison_time, a.months_free, a.prison_costs, a.arrests)
+    
+  }
+  
+  # output results
+  return (df)
+  
+}
+
+
+
+
 #### Unit tests ####
-agent_test <- agent(60)
+
+# First we re-load the data we want
+# This is just the national average
+survival_rates <- load_survival_data(0, 0)
+
+# Now test
+test_of_single_agent <- sim_single_agent(60)
+
+test_of_multi_agents <- sim_multi_agents(n_agents = 1000, n_months = 60)
 
 
-# Here is a test to see if the percent of people re-arrested matches the data in the survival rates df
-# count_rearrested <- 1
-# 
-# for (i in 1:1000) {
-#   basic <- 0
-#   agent_test <- agent(60)
-#   arrested <- (sum(agent_test$rearrested_or_not))
-#   if (arrested > 0) {
-#     count_rearrested <- count_rearrested + 1
-#   }
-# }
