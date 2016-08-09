@@ -187,6 +187,7 @@ sim_single_agent <- function(months) {
 
 
 
+#### A function with the multi-agent model : this generates data for several ppl ####
 sim_multi_agents <- function(n_agents, n_months){
   
   # set up the data frame
@@ -225,12 +226,24 @@ sim_multi_agents <- function(n_agents, n_months){
 #### Unit tests ####
 
 # First we re-load the data we want
-# This is just the national average
-survival_rates <- load_survival_data(0, 0)
+# This is the baseline for the COD population
+survival_rates <- load_survival_data(.157, 0)
 
 # Now test
-test_of_single_agent <- sim_single_agent(60)
+single_agent_test <- sim_single_agent(60)
 
-test_of_multi_agents <- sim_multi_agents(n_agents = 1000, n_months = 60)
+multi_agent_test <- sim_multi_agents(n_agents = 10000, n_months = 60)
 
+# This is kind of clumpy because some ppl could go in right at the end of the 5 yrs
+hist(multi_agent_test$prison_time)
+mean(multi_agent_test$prison_time)
+
+# This is kind of clumpy because some ppl could go in right at the end of the 5 yrs
+hist(multi_agent_test$prison_costs)
+mean(multi_agent_test$prison_costs)
+
+# arrests
+hist(multi_agent_test$arrests)
+mean(multi_agent_test$arrests)
+table(multi_agent_test$arrests)
 
