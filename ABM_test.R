@@ -114,9 +114,18 @@ say_if_in_prison <- function(m.prison_sentence) {
 
 
 # The monthly costs of prison
-calc_prison_costs <- function(m.is_in_prison) {
-  marginal_cost_of_prison <- 5000 / 12
-  if_else(m.is_in_prison == 1, marginal_cost_of_prison, 0)
+calc_prison_costs <- function(m.is_in_prison, m.month) {
+  
+  # My calculation of the marginal costs
+  # See Analyze_Costs.R
+  marginal_cost_of_prison <- 5200 / 12
+  
+  # Marginal long term
+  marginal_cost_of_prison_lt <- 16376 / 12
+  
+  if_else(m.is_in_prison == 1 & m.month <= 36, marginal_cost_of_prison, 
+          ifelse(m.is_in_prison == 1 & m.month > 36, marginal_cost_of_prison_lt,
+                 0))
 }
 
 
@@ -163,7 +172,7 @@ sim_single_agent <- function(months) {
     m.is_in_prison <- say_if_in_prison(m.prison_sentence)
     
     # Costs to prison system
-    m.prison_costs <- calc_prison_costs(m.is_in_prison)
+    m.prison_costs <- calc_prison_costs(m.is_in_prison, m.month)
     
     
     # add month to the data frame
@@ -232,7 +241,7 @@ survival_rates <- load_survival_data(.157, 0)
 # Now test
 single_agent_test <- sim_single_agent(60)
 
-multi_agent_test <- sim_multi_agents(n_agents = 10000, n_months = 60)
+multi_agent_test <- sim_multi_agents(n_agents = 1000, n_months = 60)
 
 # This is kind of clumpy because some ppl could go in right at the end of the 5 yrs
 hist(multi_agent_test$prison_time)
@@ -246,4 +255,6 @@ mean(multi_agent_test$prison_costs)
 hist(multi_agent_test$arrests)
 mean(multi_agent_test$arrests)
 table(multi_agent_test$arrests)
+
+
 
