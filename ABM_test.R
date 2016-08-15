@@ -2,7 +2,7 @@ setwd("~/Github/AgentBasedModel/")
 library(dplyr)
 
 
-## Assumptions ##
+#### Assumptions ####
 
 # First and important: the recidivism rates and prison terms are determined by historical data. These *will* change with the JRI. Recidivism rates are likely to go down as a function of the number of parole and probabtion violations. Whether crime rates do is anyone's guess, since there is not a lot of money for rehabilitation. 
 # There are ways to model this very simple using the recid_reduction_ovr_cntrl argument of the load_survival_data, but this only allows you to assume a reduction in re-arrests, not a change in the frequency of parole and probation violations.
@@ -124,8 +124,9 @@ say_if_in_prison <- function(m.prison_sentence) {
 }
 
 
-# The monthly costs of prison
-calc_prison_costs <- function(m.is_in_prison, m.month) {
+## The monthly costs of prison
+# Marginal
+calc_marginal_prison_costs <- function(m.is_in_prison, m.month) {
   
   # My calculation of the marginal costs
   # See Analyze_Costs.R
@@ -140,7 +141,36 @@ calc_prison_costs <- function(m.is_in_prison, m.month) {
 }
 
 
-calc_crime_cost <- function(crime_type)
+# Total
+calc_total_prison_costs <- function(m.is_in_prison) {
+  
+  total_cost_of_prison <- 30000 / 12
+  
+  if_else(m.is_in_prison == 1, total_cost_of_prison, 
+          0)
+}
+
+
+### The costs of crime
+# http://www.justice.utah.gov/Documents/CCJJ/Cost%20of%20Crime/Utah%20Cost%20of%20Crime%202012%20-%20Methods%20Review%20Cost.pdf
+# courts
+calc_total_court_costs <- function(m.rearrested_or_not, m.crime_type){
+  
+  ifelse(m.rearrested_or_not == 1, 
+         prison_terms$court_cost[prison_terms$offense_type == m.crime_type],
+         0)
+  
+}
+
+
+# cops
+calc_total_policing_costs <- function(m.rearrested_or_not, m.crime_type){
+  
+  ifelse(m.rearrested_or_not == 1, 
+         prison_terms$police_cost[prison_terms$offense_type == m.crime_type],
+         0)
+  
+}
 
 
 
@@ -158,7 +188,10 @@ sim_single_agent <- function(months) {
                    prison_sentence=numeric(0),
                    crime_type=factor(levels = levels.crimetype),
                    is_in_prison=numeric(0),
-                   prison_costs=numeric(0))
+                   marginal_prison_costs=numeric(0),
+                   total_prison_costs=numeric(0),
+                   total_court_costs=numeric(0),
+                   total_policing_costs=numeric(0))
   
   # loop through each month and see what happens			
   for (month in 1:months) {
@@ -185,14 +218,23 @@ sim_single_agent <- function(months) {
     # For calculating the total months in prison later
     m.is_in_prison <- say_if_in_prison(m.prison_sentence)
     
-    # Costs to prison system
-    m.prison_costs <- calc_prison_costs(m.is_in_prison, m.month)
+    ### Costs of crimes commited
+    # Prison
+    m.marginal_prison_costs <- calc_marginal_prison_costs(m.is_in_prison, m.month)
+    m.total_prison_costs <- calc_total_prison_costs(m.is_in_prison)
+    
+    # Courts
+    m.total_court_costs <- calc_total_court_costs(m.rearrested_or_not, m.crime_type)
+    
+    # Cops
+    m.total_policing_costs <- calc_total_policing_costs(m.rearrested_or_not, m.crime_type)
     
     
     # add month to the data frame
     df[month,] <- 
       c(m.month, m.months_free, m.rearrested_or_not, m.prison_sentence, 
-        m.crime_type, m.is_in_prison, m.prison_costs)
+        m.crime_type, m.is_in_prison, m.marginal_prison_costs, m.total_prison_costs,
+        m.total_court_costs, m.total_policing_costs)
     
     
     # Make temporary vector for determining months free in the next pass
