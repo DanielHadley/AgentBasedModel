@@ -2,6 +2,13 @@ setwd("~/Github/AgentBasedModel/")
 library(dplyr)
 
 
+## Assumptions ##
+
+# First and important: the recidivism rates and prison terms are determined by historical data. These *will* change with the JRI. Recidivism rates are likely to go down as a function of the number of parole and probabtion violations. Whether crime rates do is anyone's guess, since there is not a lot of money for rehabilitation. 
+# There are ways to model this very simple using the recid_reduction_ovr_cntrl argument of the load_survival_data, but this only allows you to assume a reduction in re-arrests, not a change in the frequency of parole and probation violations.
+# For future versions, we may want to think more about refining these estimates. 
+
+
 
 
 #### Load data from national and local sources for calculating probabilities ####
@@ -127,6 +134,9 @@ calc_prison_costs <- function(m.is_in_prison, m.month) {
           ifelse(m.is_in_prison == 1 & m.month > 36, marginal_cost_of_prison_lt,
                  0))
 }
+
+
+calc_crime_cost <- function(crime_type)
 
 
 
