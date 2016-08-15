@@ -173,6 +173,16 @@ calc_total_policing_costs <- function(m.rearrested_or_not, m.crime_type){
 }
 
 
+# IF out of prison, in a shelter???
+# Not sure how to think of this. Based on frequent users, it's possible that about 1/5 of the time these folks are out of prison, they are in a shelter. That's a guess. It would be good to replace with actual data
+# http://www.urban.org/sites/default/files/alfresco/publication-pdfs/412504-Frequent-Users-of-Jail-and-Shelter-Systems-in-the-District-of-Columbia-An-Overview-of-the-Potential-for-Supportive-Housing.PDF
+# http://www.endhomelessness.org/page/-/files/1101_file_Cho_Presentation.pdf
+define_shelter_days <- function(m.prison_sentence){
+  
+  ifelse(m.prison_sentence > 0, 0,
+         sample(x = (c(1,0)), 1, prob = c(.2, .8)))
+  
+}
 
 
 #### A function with the single-agent model : this generates data for one person ####
@@ -191,7 +201,8 @@ sim_single_agent <- function(months) {
                    marginal_prison_costs=numeric(0),
                    total_prison_costs=numeric(0),
                    total_court_costs=numeric(0),
-                   total_policing_costs=numeric(0))
+                   total_policing_costs=numeric(0),
+                   is_in_shelter=numeric(0))
   
   # loop through each month and see what happens			
   for (month in 1:months) {
@@ -229,12 +240,15 @@ sim_single_agent <- function(months) {
     # Cops
     m.total_policing_costs <- calc_total_policing_costs(m.rearrested_or_not, m.crime_type)
     
+    # Shelters 
+    m.is_in_shelter <- define_shelter_days(m.prison_sentence)
+    
     
     # add month to the data frame
     df[month,] <- 
       c(m.month, m.months_free, m.rearrested_or_not, m.prison_sentence, 
         m.crime_type, m.is_in_prison, m.marginal_prison_costs, m.total_prison_costs,
-        m.total_court_costs, m.total_policing_costs)
+        m.total_court_costs, m.total_policing_costs, m.is_in_shelter)
     
     
     # Make temporary vector for determining months free in the next pass
