@@ -12,10 +12,14 @@ library(dplyr)
 
 
 #### Load data from national and local sources for calculating probabilities ####
+
 ## Prison terms ##
 # Replaced national data with Utah specific data
 # I pieced this data together using an email from Julie Christensen, which contained recidivism rates for the COD demographic, and the Justice Reinvestment Report, which contained the average sentencing:
 # http://justice.utah.gov/Documents/CCJJ/Reports/Justice_Reinvestment_Report_2014.pdf
+# http://www.acluutah.org/criminal-justice/item/download/15_0cfccf37c91e9fb16be4ac2e89ca12f2
+# Crime costs come from this report, which I extrapolated for parole violations:
+# http://www.justice.utah.gov/Documents/CCJJ/Cost%20of%20Crime/Utah%20Cost%20of%20Crime%202012%20-%20Methods%20Review%20Cost.pdf
 # Before getting to the crime types and average sentences, though, it's important to grasp this statistic: 70% of parolees are returned on a technical violation. Only 30% are returned for crimes. WOW. Of those 70%, I estimate that 37 of the 70% are for parole violations, and 33 of the 70 are for probation violations
 prison_terms <- read.csv("./clean_data/utah_cod_recidivism_rates.csv", stringsAsFactors = FALSE) %>% 
   mutate(mean_time_served = round(mean_time_served))
