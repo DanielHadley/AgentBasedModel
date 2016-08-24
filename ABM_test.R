@@ -25,8 +25,8 @@ prison_terms <- read.csv("./clean_data/utah_cod_recidivism_rates.csv", stringsAs
   mutate(mean_time_served = round(mean_time_served))
 
 # I do these so that I can add a blank in the function below
-prison_terms[8,1] <- ""
-prison_terms[8,4] <- 0
+prison_terms[9,1] <- ""
+prison_terms[9,4] <- 0
 
 
 
