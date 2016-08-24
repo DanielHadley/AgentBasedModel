@@ -20,13 +20,13 @@ library(dplyr)
 # http://www.acluutah.org/criminal-justice/item/download/15_0cfccf37c91e9fb16be4ac2e89ca12f2
 # Crime costs come from this report, which I extrapolated for parole violations:
 # http://www.justice.utah.gov/Documents/CCJJ/Cost%20of%20Crime/Utah%20Cost%20of%20Crime%202012%20-%20Methods%20Review%20Cost.pdf
-# Before getting to the crime types and average sentences, though, it's important to grasp this statistic: 70% of parolees are returned on a technical violation. Only 30% are returned for crimes. WOW. Of those 70%, I estimate that 37 of the 70% are for parole violations, and 33 of the 70 are for probation violations
+# Before getting to the crime types and average sentences, though, it's important to grasp this statistic: 70% of parolees are returned on a technical violation.
 prison_terms <- read.csv("./clean_data/utah_cod_recidivism_rates.csv", stringsAsFactors = FALSE) %>% 
   mutate(mean_time_served = round(mean_time_served))
 
 # I do these so that I can add a blank in the function below
-prison_terms[9,1] <- ""
-prison_terms[9,4] <- 0
+prison_terms[8,1] <- ""
+prison_terms[8,4] <- 0
 
 
 

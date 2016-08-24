@@ -1,9 +1,8 @@
 offense_type,mean_time_served,frequency_of_crime,frequency,assumptions,court_cost,police_cost
-Murder,209,0.0167,0.00501,NA,62037,4509
-Person,61.5,0.2381,0.07143,NA,5443,4509
-Sex,73,0.0667,0.02001,NA,5443,4509
-Property,23,0.3143,0.09429,NA,2284,880
-Drug,17.6,0.2214,0.06642,includes posession,2284,880
-Other,16.9,0.1428,0.04284,weapons and driving and other,2284,880
-Parole_Violation,15.7,NA,0.37,court and police costs similar to property,2284,880
-Probation_Violation,7.9,NA,0.33,court and police costs similar to property,2284,880
+Murder,209,0.0167,0.004922342,NA,62037,4509
+Person,61.5,0.2381,0.070180215,NA,5443,4509
+Sex,73,0.0667,0.019659892,NA,5443,4509
+Property,23,0.3143,0.092640242,NA,2284,880
+Drug,17.6,0.2214,0.065257873,includes posession,2284,880
+Other,16.9,0.1428,0.042090444,weapons and driving and other,2284,880
+Parole_Violation,15.7,NA,0.705,court and police costs similar to property,2284,880
