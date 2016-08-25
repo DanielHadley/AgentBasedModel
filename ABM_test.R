@@ -194,12 +194,12 @@ calc_shelter_costs <- function(m.is_in_shelter){
 
 
 # Adult probation and parole
-calc_total_app_costs <- function(m.is_in_prison, m.months_free){
+calc_total_app_costs <- function(m.is_on_parole){
   
   # Based on the cost per day data
   # And average length of stay in parole
   
-  ifelse(m.is_in_prison == 0 & m.months_free < 23, 10 * 30, 0)
+  ifelse(m.is_on_parole == 1, 10 * 30, 0)
   
 }
 
@@ -219,13 +219,14 @@ sim_single_agent <- function(months) {
                    prison_sentence=numeric(0),
                    crime_type=factor(levels = levels.crimetype),
                    is_in_prison=numeric(0),
+                   is_on_parole=numeric(0),
                    marginal_prison_costs=numeric(0),
                    total_prison_costs=numeric(0),
                    total_court_costs=numeric(0),
                    total_policing_costs=numeric(0),
                    is_in_shelter=numeric(0),
                    total_shelter_costs=numeric(0),
-                   total_probation_costs=numeric(0))
+                   total_parole_costs=numeric(0))
   
   # loop through each month and see what happens			
   for (month in 1:months) {
@@ -248,9 +249,20 @@ sim_single_agent <- function(months) {
     m.prison_sentence <- as.numeric(crime_and_time[2])
     
     m.crime_type <- as.character(crime_and_time[1])
+  
     
     # For calculating the total months in prison later
     m.is_in_prison <- say_if_in_prison(m.prison_sentence)
+    
+    # And a parole sentence for when they get out
+    m.parole_sentence <- ifelse(m.month == 1, 18, #the national average
+                                ifelse(m.rearrested_or_not == 1, 
+                                       m.prison_sentence * .4,
+                                       tmp.parole_sentence))
+    
+    # Is on parole??
+    m.is_on_parole <- if_else(m.is_in_prison == 1, 0,
+                              ifelse(m.months_free <= m.parole_sentence, 1, 0))
     
     ### Costs of crimes commited
     # Prison
@@ -267,20 +279,23 @@ sim_single_agent <- function(months) {
     m.is_in_shelter <- define_shelter_days(m.is_in_prison)
     m.total_shelter_costs <- calc_shelter_costs(m.is_in_shelter)
     
-    # Probation and Parole
-    m.total_probation_costs <- calc_total_app_costs(m.is_in_prison, m.months_free)
+    # Parole
+    m.total_parole_costs <- calc_total_app_costs(m.is_on_parole)
     
     
     # add month to the data frame
     df[month,] <- 
       c(m.month, m.months_free, m.rearrested_or_not, m.prison_sentence, 
-        m.crime_type, m.is_in_prison, m.marginal_prison_costs, m.total_prison_costs,
-        m.total_court_costs, m.total_policing_costs, m.is_in_shelter, 
-        m.total_shelter_costs, m.total_probation_costs)
+        m.crime_type, m.is_in_prison, m.is_on_parole, m.marginal_prison_costs, 
+        m.total_prison_costs, m.total_court_costs, m.total_policing_costs, 
+        m.is_in_shelter, m.total_shelter_costs, m.total_parole_costs)
     
     
     # Make temporary vector for determining months free in the next pass
     tmp.months_free <- if_else(m.rearrested_or_not == 1, 0, m.months_free)
+    
+    # Temporary parole sentence
+    tmp.parole_sentence <- m.parole_sentence
     
     # Also, count down the time served from last month, if any
     tmp.prison_sentence <- ifelse(m.prison_sentence == 0, 0,
