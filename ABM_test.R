@@ -430,3 +430,55 @@ summary(multi_agent_test$avg_total_cost_per_yr)
 
 
 
+#### Run the model using data extrapolated to represent JRI changes ####
+
+### First load and change the sentencing data
+prison_terms <- read.csv("./clean_data/utah_cod_recidivism_rates.csv", stringsAsFactors = FALSE) %>% 
+  mutate(mean_time_served = round(mean_time_served))
+
+# I do these so that I can add a blank in the function below
+prison_terms[8,1] <- ""
+prison_terms[8,4] <- 0
+
+# One big change from the JRI is that prison sentences for technical violations are capped
+# So we change the 15-month mean to a 2-month one
+# page 39: http://www.utah.gov/pmn/files/172049.pdf
+prison_terms$mean_time_served[prison_terms$offense_type == "Parole_Violation"] <- 2
+
+
+### Additionally, we would expect JRI to decrease recidivism. ###
+# I heard one estimate of 5%. That seems low, but conservative
+# .157 is the increase in the baseline for the COD population
+# .05 is the recidivism reduction
+survival_rates <- load_survival_data(.157, .05)
+
+# Now test
+single_agent_test <- sim_single_agent(60)
+
+multi_agent_test <- sim_multi_agents(n_agents = 1000, n_months = 60)
+
+# This is kind of clumpy because some ppl could go in right at the end of the 5 yrs
+hist(multi_agent_test$prison_time)
+mean(multi_agent_test$prison_time)
+
+# This is kind of clumpy because some ppl could go in right at the end of the 5 yrs
+hist(multi_agent_test$prison_costs)
+mean(multi_agent_test$prison_costs)
+
+# arrests
+hist(multi_agent_test$arrests)
+mean(multi_agent_test$arrests)
+table(multi_agent_test$arrests)
+
+# Costs
+hist(multi_agent_test$total_costs)
+mean(multi_agent_test$total_costs)
+
+hist(multi_agent_test$avg_total_cost_per_yr)
+mean(multi_agent_test$avg_total_cost_per_yr)
+summary(multi_agent_test$avg_total_cost_per_yr)
+
+
+
+
+
