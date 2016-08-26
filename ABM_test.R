@@ -142,6 +142,7 @@ calc_marginal_prison_costs <- function(m.is_in_prison, m.month) {
 
 
 # Total
+# From the CPD data
 calc_total_prison_costs <- function(m.is_in_prison) {
   
   total_cost_of_prison <- 30000 / 12
@@ -174,32 +175,63 @@ calc_total_policing_costs <- function(m.rearrested_or_not, m.crime_type){
 
 
 # IF out of prison, in a shelter???
-# Not sure how to think of this. Based on frequent users, it's possible that about 1/5 of the time these folks are out of prison, they are in a shelter. That's a guess. It would be good to replace with actual data
+# Not sure how to think of this.
+# Low end estimate: 386 out of 17,039 on parole or probation are in CCCs (2.2%)
+# High end estimate: the frequent users in DC spent 25% in a shelter.
+# Medium but conservative: "In CA, 10% of state’s parolees are homeless"
 # http://www.urban.org/sites/default/files/alfresco/publication-pdfs/412504-Frequent-Users-of-Jail-and-Shelter-Systems-in-the-District-of-Columbia-An-Overview-of-the-Potential-for-Supportive-Housing.PDF
 # http://www.endhomelessness.org/page/-/files/1101_file_Cho_Presentation.pdf
 define_shelter_days <- function(m.is_in_prison){
   
   ifelse(m.is_in_prison == 1, 0,
-         sample(x = (c(1,0)), 1, prob = c(.2, .8)))
+         sample(x = (c(1,0)), 1, prob = c(.1, .9)))
   
 }
 
 
-# There are a lot of possibilities for calculating the costs. Yvette sent data on Palmer Court and other shelters. Julia sent some data on the cost to operate and number of folks in halfway houses. There is a huge variety in costs. I think Yvette's estimate is a good place to start. 
-calc_shelter_costs <- function(m.is_in_shelter){
+# When they are on parole, most will not go to a homeless shelter, but rather a CCC
+# The cost to operate those are in the CPD data from AP&P. 
+# There are a lot of possibilities for calculating the costs when they are off parole. Yvette sent data on Palmer Court and other shelters. Julia sent some data on the cost to operate and number of folks in halfway houses. There is a huge variety in costs. I think Yvette's estimate is a good place to start, which is 10.10. 
+calc_shelter_costs <- function(m.is_in_shelter, m.is_on_parole){
   
-  ifelse(m.is_in_shelter == 1, 10.10 * 30, 0)
+  shelter_cost <- 10.10
+  CCC_cost <- mean(54, 102, 75, 143, 95)
+  
+  ifelse(m.is_in_shelter == 1 & m.is_on_parole == 0, shelter_cost * 30.5,
+         ifelse(m.is_in_shelter == 1 & m.is_on_parole == 1, CCC_cost * 30.5,
+         0))
   
 }
 
 
-# Adult probation and parole
+# Adult parole costs (this group will not get probation)
+# This data comes from the cost per day pdf given to me
 calc_total_app_costs <- function(m.is_on_parole){
   
   # Based on the cost per day data
-  # And average length of stay in parole
+  # But minus the shelter,i.e., CCCs, because those are only used by a portion
   
-  ifelse(m.is_on_parole == 1, 10 * 30, 0)
+  cost_per_day <- (.23 + .62 + .51) + #admin costs
+    mean(7.06, 6.5, 5.48, 8.34, 6.13) + # Avg of Region costs
+    .5 # community programs
+    
+  
+  ifelse(m.is_on_parole == 1, cost_per_day * 30.5, 0)
+  
+}
+
+
+# DWS & DHS
+# average costs for DWS - food stamps, abd, WIOA, etc - are 75$ for adult males in the program
+# It's probably safe to assume that the average COD parolee uses that
+# DHS spends an average of $3000 per client on Substance use and $3000 per client on Mental Health, including inpatient, outpatient, crisis care, etc.
+# Probably safe to assume there is some overlap here, but not total overlap. Conservatively, we will say $3000 total per parolee / yr, and hope that will make up for the fact that some probably do not use it at all. 
+calc_total_DWS_DHS_costs <- function(m.is_in_prison){
+  
+  DWS <- 75
+  DHS <- 3000 / 12
+  
+  ifelse(m.is_in_prison == 0, DHS + DWS, 0)
   
 }
 
@@ -220,13 +252,15 @@ sim_single_agent <- function(months) {
                    crime_type=factor(levels = levels.crimetype),
                    is_in_prison=numeric(0),
                    is_on_parole=numeric(0),
+                   parole_sentence=numeric(0),
                    marginal_prison_costs=numeric(0),
                    total_prison_costs=numeric(0),
                    total_court_costs=numeric(0),
                    total_policing_costs=numeric(0),
                    is_in_shelter=numeric(0),
                    total_shelter_costs=numeric(0),
-                   total_parole_costs=numeric(0))
+                   total_parole_costs=numeric(0),
+                   total_DWS_DHS_costs=numeric(0))
   
   # loop through each month and see what happens			
   for (month in 1:months) {
@@ -277,18 +311,22 @@ sim_single_agent <- function(months) {
     
     # Shelters 
     m.is_in_shelter <- define_shelter_days(m.is_in_prison)
-    m.total_shelter_costs <- calc_shelter_costs(m.is_in_shelter)
+    m.total_shelter_costs <- calc_shelter_costs(m.is_in_shelter, m.is_on_parole)
     
     # Parole
     m.total_parole_costs <- calc_total_app_costs(m.is_on_parole)
+    
+    # DWS
+    m.total_DWS_DHS_costs <- calc_total_DWS_DHS_costs(m.is_in_prison)
     
     
     # add month to the data frame
     df[month,] <- 
       c(m.month, m.months_free, m.rearrested_or_not, m.prison_sentence, 
-        m.crime_type, m.is_in_prison, m.is_on_parole, m.marginal_prison_costs, 
-        m.total_prison_costs, m.total_court_costs, m.total_policing_costs, 
-        m.is_in_shelter, m.total_shelter_costs, m.total_parole_costs)
+        m.crime_type, m.is_in_prison, m.is_on_parole, m.parole_sentence, 
+        m.marginal_prison_costs, m.total_prison_costs, m.total_court_costs, 
+        m.total_policing_costs, m.is_in_shelter, m.total_shelter_costs, 
+        m.total_parole_costs, m.total_DWS_DHS_costs)
     
     
     # Make temporary vector for determining months free in the next pass
