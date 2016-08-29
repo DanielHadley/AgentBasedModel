@@ -124,6 +124,16 @@ say_if_in_prison <- function(m.prison_sentence) {
 }
 
 
+# Parole
+# AS far as I can tell, 3 years is standard for all offenders. Crazy.
+# http://law.justia.com/codes/utah/2006/title76/76_03009.html
+calc_parole_sentence <- function(m.month, m.rearrested_or_not, tmp.parole_sentence){
+  ifelse(m.month == 1, 36,
+         ifelse(m.rearrested_or_not == 1, 36,
+                tmp.parole_sentence))
+}
+
+
 ## The monthly costs of prison
 # Marginal
 calc_marginal_prison_costs <- function(m.is_in_prison, m.month) {
@@ -289,10 +299,7 @@ sim_single_agent <- function(months) {
     m.is_in_prison <- say_if_in_prison(m.prison_sentence)
     
     # And a parole sentence for when they get out
-    m.parole_sentence <- ifelse(m.month == 1, 18, #the national average
-                                ifelse(m.rearrested_or_not == 1, 
-                                       m.prison_sentence * .4,
-                                       tmp.parole_sentence))
+    m.parole_sentence <- calc_parole_sentence(m.month, m.rearrested_or_not, tmp.parole_sentence)
     
     # Is on parole??
     m.is_on_parole <- if_else(m.is_in_prison == 1, 0,
@@ -446,11 +453,25 @@ prison_terms[8,4] <- 0
 prison_terms$mean_time_served[prison_terms$offense_type == "Parole_Violation"] <- 2
 
 
+# Parole
+# from Sofia:
+# "A parolee can now reduce the standard 3 year term by half if he/she is compliant with his/hers terms of supervision"
+# I assume that if they are not rearrested, they are compliant for the 18 month term
+# http://law.justia.com/codes/utah/2006/title76/76_03009.html
+calc_parole_sentence <- function(m.month, m.rearrested_or_not, tmp.parole_sentence){
+  ifelse(m.month == 1, 18,
+         ifelse(m.rearrested_or_not == 1, 18,
+                tmp.parole_sentence))
+}
+
+
 ### Additionally, we would expect JRI to decrease recidivism. ###
-# I heard one estimate of 5%. That seems low, but conservative
+# I heard one estimate of 5%. That seems low
+# Probably more like 10%, given that 70% of recidivism was from parole violations
+# and now parole violations are capped
 # .157 is the increase in the baseline for the COD population
-# .05 is the recidivism reduction
-survival_rates <- load_survival_data(.157, .05)
+# .1 is the recidivism reduction
+survival_rates <- load_survival_data(.157, .1)
 
 # Now test
 single_agent_test <- sim_single_agent(60)
