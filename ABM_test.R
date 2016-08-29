@@ -26,7 +26,10 @@ prison_terms <- read.csv("./clean_data/utah_cod_recidivism_rates.csv", stringsAs
 
 # I do these so that I can add a blank in the function below
 prison_terms[8,1] <- ""
-prison_terms[8,4] <- 0
+
+# replcace NAs with 0
+prison_terms$frequency[is.na(prison_terms$frequency)] <- 0
+prison_terms$frequency_of_crime[is.na(prison_terms$frequency_of_crime)] <- 0
 
 
 
@@ -90,14 +93,27 @@ calc_odds_of_being_rearrested <- function(m.months_free) {
 
 
 # If arrested what is the prison sentence? This samples from the crime frequencies and returns a sentence based on the selected crime.
-define_crime_and_time <- function(m.rearrested_or_not, m.month, tmp.prison_sentence) {
+define_crime_and_time <- function(tmp.is_on_parole, m.rearrested_or_not, m.month, tmp.prison_sentence) {
   
   # First the index of crime and time, based on a probabilistic sample of crime types
   # It's a little ineffecient to do this every time, but NBD
-  crime_index <- sample(x = c(1:nrow(prison_terms)),
+  # TODO: think through the fact that after parole the chance of a serious crime incrases. So, if parole is reduced, but the kaplan meir curves stay the same, this could increase the # of crimes beyond what is reasonable.
+  # one option is to change the kaplan meier curves
+  if_on_parole <- sample(x = c(1:nrow(prison_terms)),
                         size = 1,
                         replace = FALSE,
                         prob = c(prison_terms$frequency))
+  
+  # By definition, if they are off parole they can only be arrested for a crime
+  if_off_parole <- sample(x = c(1:nrow(prison_terms)),
+                          size = 1,
+                          replace = FALSE,
+                          prob = c(prison_terms$frequency_of_crime))
+  
+  # There is a one month lag b/c I am using the tmp.is_on_parole, but that is acceptble
+  crime_index <- ifelse(m.month == 1, if_on_parole,
+                        ifelse(tmp.is_on_parole == 1, if_on_parole,
+                               if_off_parole))
   
   # The crime
   crime <- if_else(m.rearrested_or_not == 1, 
@@ -288,7 +304,7 @@ sim_single_agent <- function(months) {
     # Add a crime and prison sentence if there was an arrest
     # Also based on probability table from national trends
     crime_and_time <- 
-      define_crime_and_time(m.rearrested_or_not, m.month, tmp.prison_sentence)
+      define_crime_and_time(m.is_on_parole, m.rearrested_or_not, m.month, tmp.prison_sentence)
     
     m.prison_sentence <- as.numeric(crime_and_time[2])
     
@@ -341,6 +357,7 @@ sim_single_agent <- function(months) {
     
     # Temporary parole sentence
     tmp.parole_sentence <- m.parole_sentence
+    tmp.is_on_parole <- m.is_on_parole
     
     # Also, count down the time served from last month, if any
     tmp.prison_sentence <- ifelse(m.prison_sentence == 0, 0,
@@ -445,16 +462,23 @@ prison_terms <- read.csv("./clean_data/utah_cod_recidivism_rates.csv", stringsAs
 
 # I do these so that I can add a blank in the function below
 prison_terms[8,1] <- ""
-prison_terms[8,4] <- 0
 
-# One big change from the JRI is that prison sentences for technical violations are capped
+# replcace NAs with 0
+prison_terms$frequency[is.na(prison_terms$frequency)] <- 0
+prison_terms$frequency_of_crime[is.na(prison_terms$frequency_of_crime)] <- 0
+
+# One big change is that offenders can get what's called earned time credits while incarcerated, which can also impact their length of stay (reduce it).
+# I'll start with reductions of 20%. That seems possible.
+prison_terms$mean_time_served <- prison_terms$mean_time_served * .8
+
+# Another big change from the JRI is that prison sentences for technical violations are capped
 # So we change the 15-month mean to a 2-month one
 # page 39: http://www.utah.gov/pmn/files/172049.pdf
 prison_terms$mean_time_served[prison_terms$offense_type == "Parole_Violation"] <- 2
 
 
 # Parole
-# from Sofia:
+# from Sofia, re: JRI
 # "A parolee can now reduce the standard 3 year term by half if he/she is compliant with his/hers terms of supervision"
 # I assume that if they are not rearrested, they are compliant for the 18 month term
 # http://law.justia.com/codes/utah/2006/title76/76_03009.html
